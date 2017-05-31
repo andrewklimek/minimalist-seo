@@ -1,9 +1,9 @@
 <?php
 /*
 Plugin Name: Minimalist SEO
-Plugin URI:  https://github.com/andrewklimek/
-Description: Essential SEO.  Includes custom formulaic <title> tags
-Version:     0.1
+Plugin URI:  https://github.com/andrewklimek/minimalist-seo
+Description: SEO essentials.  Notably, a <title> tag builder with "merge fields"
+Version:     0.1.0
 Author:      Andrew J Klimek
 Author URI:  https://andrewklimek.com
 License:     GPL2
