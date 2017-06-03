@@ -45,7 +45,7 @@ function mnmlseo_schema() {
 		$post_author = get_userdata( $data->post_author );
 		$description = get_post_meta( $data->ID, 'mnmlseo_description', true );
 		if ( ! $description ) {
-			// the codex doesn't say, but this won't auto-generate excerpts outside the loop
+			// the codex doesn't say, but get_the_content won't auto-generate excerpts outside the loop
 			// Good in this case, the first 55 chars would be a crappy meta description
 			$description = $data->post_excerpt;
 		}
@@ -174,7 +174,7 @@ function mnmlseo_seo_meta_box_callback( $post, $metabox ) {
 
 	echo '
 		<p><span class="description">The size of these fields shows where Google would cut off the text.  You can type beyond but it probably won’t display in search results.</span></p>
-		<p><label for="mnmlseo_title">Custom Title: </label></p>
+		<p><label for="mnmlseo_title">Title Tag: </label></p>
 		<textarea id="mnmlseo_title" name="mnmlseo_title" style="width:35.5em; max-width:100%; height: 1.9em; overflow-y: scroll;" placeholder="default is “Post Title - Site Name”">' . esc_attr( $title ) . '</textarea>
 		<div class="description">You can use [title] to automatically insert the post title and [tax:your_taxonomy] for a string of terms, e.g., “[title], a post about [tax:tags]”</div>
 		<p><label for="mnmlseo_description">Meta Description: </label></p>
