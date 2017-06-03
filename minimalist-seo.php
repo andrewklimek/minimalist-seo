@@ -23,7 +23,7 @@ Minimalist SEO. If not, see https://www.gnu.org/licenses/gpl-2.0.html.
 
 function mnmlseo_schema() {
 	
-	$metadata = false;
+	$metadata = $description = false;
 	
 	if ( is_front_page() ) {
 		
@@ -43,6 +43,11 @@ function mnmlseo_schema() {
 		global $post;
 		$data = $post; // so that we don't accidentally explode the global
 		$post_author = get_userdata( $data->post_author );
+		$description = get_post_meta( $data->ID, 'mnmlseo_description', true );
+		if ( ! $description ) {
+			$description = get_the_excerpt( $data->ID );
+			poo($data->post_excerpt,'$description');
+		}
 	
 		$metadata = array(
 			"@context" => "http://schema.org",
@@ -77,6 +82,9 @@ function mnmlseo_schema() {
 	if ( $metadata ) {
 		echo '<script type="application/ld+json">'. json_encode( $metadata ) .'</script>';
 	}
+	if ( $description ) {
+		echo '<meta name="description" content="'. esc_attr( $description ) .'">';
+	}
 }
 add_action( 'wp_head', 'mnmlseo_schema' );
 
@@ -110,11 +118,22 @@ function mnmlseo_seo_meta_box_callback( $post, $metabox ) {
 	 * Use get_post_meta() to retrieve an existing value
 	 * from the database and use the value for the form.
 	 */
-	$value = get_post_meta( $post->ID, 'mnmlseo_custom_title', true );
-	if ( ! $value ) $value = '';
+	$title = get_post_meta( $post->ID, 'mnmlseo_custom_title', true );
+	if ( ! $title ) $title = '';
 
-	echo '<label for="mnmlseo_custom_title">Custom Title: </label>';
-	echo '<input type="text" id="mnmlseo_custom_title" name="mnmlseo_custom_title" class="large-text" value="' . esc_attr( $value ) . '">';
+	echo '';
+	
+	$description = get_post_meta( $post->ID, 'mnmlseo_description', true );
+	if ( ! $description ) $description = '';
+
+	echo '
+		<p><span class="description">The size of these fields shows where Google would cut off the text.  You can type beyond but it probably won’t display in search results.</span></p>
+		<p><label for="mnmlseo_custom_title">Custom Title: </label></p>
+		<textarea id="mnmlseo_custom_title" name="mnmlseo_custom_title" style="width:35.5em; max-width:100%; height: 1.9em; overflow-y: scroll;" placeholder="default is “Post Title - Site Name”">' . esc_attr( $title ) . '</textarea>
+		<span class="description">You can use [title] to automatically insert the post title and [tax:your_taxonomy] for a string of terms, e.g., “[title], a post about [tax:tags]”</span>
+		<p><label for="mnmlseo_description">Meta Description: </label></p>
+		<textarea id="mnmlseo_description" name="mnmlseo_description" placeholder="Uses post excerpt by default. Type here to customize." style="word-break:break-all; width:40.5em; max-width:100%; height:3.3em; overflow-y: scroll;">' . esc_attr( $description ) . '</textarea>
+		<span class="description">Google will sometimes use the meta description of a page in search results snippets, if they think it gives users a more accurate description than would be possible purely from the on-page content. <a href="https://support.google.com/webmasters/answer/35624#1" rel="nofollow">[read more]</a></span>';
 }
 
 /**
@@ -161,13 +180,17 @@ function mnmlseo_save_seo_meta_box_data( $post_id ) {
 	/* OK, it's safe for us to save the data now. */
 
 	// Make sure that it is set.
-	if ( ! isset( $_POST['mnmlseo_custom_title'] ) ) {
-		return;
+	if ( ! empty( $_POST['mnmlseo_custom_title'] ) ) {
+		// Sanitize user input... is it needed?
+		// Update the meta field in the database.
+		update_post_meta( $post_id, 'mnmlseo_custom_title', sanitize_text_field( $_POST['mnmlseo_custom_title'] ) );
+	}
+	if ( ! empty( $_POST['mnmlseo_description'] ) ) {
+		
+		update_post_meta( $post_id, 'mnmlseo_description', sanitize_text_field( $_POST['mnmlseo_description'] ) );
 	}
 
-	// Sanitize user input... is it needed?
-	// Update the meta field in the database.
-	update_post_meta( $post_id, 'mnmlseo_custom_title', sanitize_text_field( $_POST['mnmlseo_custom_title'] ) );
+	
 }
 add_action( 'save_post', 'mnmlseo_save_seo_meta_box_data' );
 
