@@ -94,14 +94,15 @@ add_action( 'wp_head', 'mnmlseo_schema' );
 
 
 function mnmlseo_custom_title() {
-	$id = get_the_ID();
-	$title = get_post_meta( $id, 'mnmlseo_title', true );
+	
+	$post = get_post();
+	$title = get_post_meta( $post->ID, 'mnmlseo_title', true );
 	
 	if ( ! $title ) {
 		return '';
 	}
 
-	$title = str_ireplace( '[title]', single_post_title( '', false ), $title );// why not get_the_title, or global post?
+	$title = str_ireplace( '[title]', $post->post_title, $title );
 	
 	$title = mnmlseo_process_meta( $title, $id );
 	
