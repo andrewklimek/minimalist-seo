@@ -55,6 +55,8 @@ function mnmlseo_schema() {
 		
 		$data = $post; // so that we don't accidentally explode the global
 		
+		echo "<meta property=og:url content='". get_permalink( $data->ID ) ."'>";
+		
 		/** Author **/
 		$post_author = get_userdata( $data->post_author );
 		
