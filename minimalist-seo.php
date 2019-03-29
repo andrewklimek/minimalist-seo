@@ -44,16 +44,39 @@ function mnmlseo_schema() {
 		echo "<meta property=og:type content=article>";
 		
 		global $post;
-		// setup_postdata($post);// get_the_excerpt() doesn't work without this.
+		
 		$data = $post; // so that we don't accidentally explode the global
 		$post_author = get_userdata( $data->post_author );
+		
+		/** DESCRIPTION **/
+		
 		$description = get_post_meta( $data->ID, 'mnmlseo_description', true );
-		if ( ! $description ) {
-			// $data->post_excerpt will be blank if an excerpt hasn't been explicitly added.
-			// Could use get_the_excerpt() but is the first 55 characters in a post even a useful meta description?
-			// Not Usually... Better off letting Google decide a contextual snippet.
-			//$description = get_the_excerpt();// This requires setup_postdata($post) to work (since outside the loop)
+		
+		if ( $description )
+			$description = mnmlseo_process_meta( $description, $data->ID );
+		else
 			$description = $data->post_excerpt;
+		
+		if ( $description )
+		{	
+			$description = esc_attr( $description );
+	
+			echo "<meta name=description content='{$description}'>";
+			echo "<meta property=og:description content='{$description}'>";
+		}
+		else
+		{
+			/**
+			 * $data->post_excerpt will have been blank if an excerpt hasn't been explicitly added.
+			 * Could use get_the_excerpt() but is the first 55 words in a post even a useful meta description?
+			 * Not Usually... Better off letting Google decide a contextual snippet.
+			 * However, it is better than what Facebook would show for the preview snippet...
+			 * So, we'll only add it for the Open Graph meta.
+			 * get_the_excerpt() doesn't work without setup_postdata() since we're outside the loop.
+			 **/
+			setup_postdata($post);
+			if ( $description = get_the_excerpt() )
+				echo "<meta property=og:description content='". esc_attr( $description ) ."'>";
 		}
 	
 		$metadata = array(
@@ -89,12 +112,6 @@ function mnmlseo_schema() {
 	
 	if ( $metadata ) {
 		echo '<script type="application/ld+json">'. json_encode( $metadata ) .'</script>';
-	}
-	if ( $description ) {
-		
-		$description = mnmlseo_process_meta( $description, $data->ID );
-		
-		echo '<meta name="description" content="'. esc_attr( $description ) .'">';
 	}
 }
 add_action( 'wp_head', 'mnmlseo_schema' );
