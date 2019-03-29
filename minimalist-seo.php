@@ -3,7 +3,7 @@
 Plugin Name: Minimalist SEO
 Plugin URI:  https://github.com/andrewklimek/minimalist-seo
 Description: SEO essentials.  Notably, a <title> tag builder with "merge fields"
-Version:     0.1.0
+Version:     0.2.0
 Author:      Andrew J Klimek
 Author URI:  https://andrewklimek.com
 License:     GPL2
@@ -29,7 +29,7 @@ function mnmlseo_schema() {
 		
 		$metadata = array(
 			"@context" => "http://schema.org",
-		   "@type" => "WebSite",
+			"@type" => "WebSite",
 			"name" => get_option('blogname'),
 			"url" => home_url(),
 			"potentialAction" => array(
@@ -40,13 +40,19 @@ function mnmlseo_schema() {
 		);
 		
 	} elseif ( is_singular() ) {
+		
+		echo "<meta property=og:type content=article>";
+		
 		global $post;
+		// setup_postdata($post);// get_the_excerpt() doesn't work without this.
 		$data = $post; // so that we don't accidentally explode the global
 		$post_author = get_userdata( $data->post_author );
 		$description = get_post_meta( $data->ID, 'mnmlseo_description', true );
 		if ( ! $description ) {
-			// the codex doesn't say, but get_the_content won't auto-generate excerpts outside the loop
-			// Good in this case, the first 55 chars would be a crappy meta description
+			// $data->post_excerpt will be blank if an excerpt hasn't been explicitly added.
+			// Could use get_the_excerpt() but is the first 55 characters in a post even a useful meta description?
+			// Not Usually... Better off letting Google decide a contextual snippet.
+			//$description = get_the_excerpt();// This requires setup_postdata($post) to work (since outside the loop)
 			$description = $data->post_excerpt;
 		}
 	
@@ -76,6 +82,7 @@ function mnmlseo_schema() {
 					'width' => $post_image_src[1],
 					'height' => $post_image_src[2],
 				);
+				echo "<meta property=og:image content={$post_image_src[0]}>";
 			}
 		}
 	}
