@@ -3,7 +3,7 @@
 Plugin Name: Minimalist SEO
 Plugin URI:  https://github.com/andrewklimek/minimalist-seo
 Description: SEO essentials.  Notably, a <title> tag builder with "merge fields"
-Version:     0.2.0
+Version:     0.3.0
 Author:      Andrew J Klimek
 Author URI:  https://andrewklimek.com
 License:     GPL2
@@ -25,6 +25,12 @@ function mnmlseo_schema() {
 	
 	$metadata = $description = false;
 	
+	$mnmlseo_ids = get_option( 'mnmlseo_ids' );
+	
+	if ( !empty( $mnmlseo_ids['fb_app_id'] ) )
+		echo "<meta property=fb:app_id content={$mnmlseo_ids['fb_app_id']}>";
+
+	
 	if ( is_front_page() ) {
 		
 		$metadata = array(
@@ -42,11 +48,20 @@ function mnmlseo_schema() {
 	} elseif ( is_singular() ) {
 		
 		echo "<meta property=og:type content=article>";
+		// echo "<meta name=twitter:card content=summary_large_image>";// summary, summary_large_image, app, or player
+
 		
 		global $post;
 		
 		$data = $post; // so that we don't accidentally explode the global
+		
+		/** Author **/
 		$post_author = get_userdata( $data->post_author );
+		
+		if ( !empty( $mnmlseo_ids['twitter_site'] ) )
+			echo "<meta name=twitter:site content={$mnmlseo_ids['twitter_site']}>";
+		// TODO: add author twitter field to user profiles.
+		// echo "<meta name=twitter:creator content='@authors_username'>";
 		
 		/** DESCRIPTION **/
 		
@@ -78,11 +93,16 @@ function mnmlseo_schema() {
 			if ( $description = get_the_excerpt() )
 				echo "<meta property=og:description content='". esc_attr( $description ) ."'>";
 		}
+		
+		$title = get_post_meta( $data->ID, 'mnmlseo_title', true );
+		if ( ! $title ) $title = get_the_title( $data->ID );
+		
+		echo "<meta property=og:title content='{$title}'>";// needed more for twitter than FB, but since twitter meta falls back to OG, why not use OG.
 	
 		$metadata = array(
 			"@context" => "http://schema.org",
 			"@type" => "BlogPosting",
-			"headline" => get_the_title( $data->ID ),
+			"headline" => $title,
 			// "author" => array(
 			// 	"@type" => "Person",
 			// 	"name" => $post_author->display_name
@@ -105,7 +125,8 @@ function mnmlseo_schema() {
 					'width' => $post_image_src[1],
 					'height' => $post_image_src[2],
 				);
-				echo "<meta property=og:image content={$post_image_src[0]}>";
+				echo "<meta property=og:image content={$post_image_src[0]}><meta property=og:image:width content={$post_image_src[1]}><meta property=og:image:height content={$post_image_src[2]}>";
+				echo "<meta name=twitter:card content=summary_large_image>";
 			}
 		}
 	}
@@ -273,3 +294,107 @@ function mnmlseo_save_seo_meta_box_data( $post_id ) {
 	
 }
 add_action( 'save_post', 'mnmlseo_save_seo_meta_box_data' );
+
+
+
+
+/****
+*
+* Settings Page
+*
+****/
+
+add_action( 'admin_menu', 'mnmlseo_admin_menu' );
+add_action( 'admin_init', 'mnmlseo_settings_ids' );
+/****
+*
+* Register admin pages
+*
+****/
+function mnmlseo_admin_menu() {
+	add_submenu_page( 'options-general.php', 'SEO', 'SEO', 'edit_users', 'mnmlseo', 'mnmlseo_settings_page' );
+	// add_submenu_page( 'tools.php', 'Test Email', 'Test Email', 'edit_users', 'mnmlseo-test', 'mnmlseo_test' );
+}
+/****
+*
+* Settings > Email
+*
+****/
+function mnmlseo_settings_page() {
+?>
+<div class="wrap">
+	<h2>Minimalist SEO</h2>
+	<form action="options.php" method="post">
+		<?php settings_fields( 'mnmlseo' ); ?>
+		<?php do_settings_sections( 'mnmlseo' ); ?>
+		<?php submit_button(); ?>
+	</form>
+</div>
+<?php
+}
+/****
+*
+* Settings > Email > SMTP
+*
+****/
+function mnmlseo_settings_ids() {
+
+	$section = 'mnmlseo_ids';
+	$settings = get_option( $section );
+	
+	add_settings_section(
+		$section,
+		'Account IDs',// heading
+		$section .'_callback',
+		'mnmlseo'
+	);
+	
+	$field = 'twitter_site';
+	add_settings_field(
+		"{$section}_{$field}",
+		'Site-wide Twitter handle',// label
+		'mnmlseo_setting_callback_text',
+		'mnmlseo',
+		$section,
+		array( 'label_for' => "{$section}_{$field}", 'name' => "{$section}[{$field}]", 'value' => isset($settings[$field]) ? $settings[$field] : '', 'placeholder' => "@username" )
+	);
+	
+	$field = 'fb_app_id';// https://developers.facebook.com/apps/redirect/dashboard
+	add_settings_field(
+		"{$section}_{$field}",
+		'Facebook App ID',// label
+		'mnmlseo_setting_callback_text',
+		'mnmlseo',
+		$section,
+		array( 'label_for' => "{$section}_{$field}", 'name' => "{$section}[{$field}]", 'value' => isset($settings[$field]) ? $settings[$field] : '', 'placeholder' => "123456789012345" )
+	);
+
+	
+	register_setting( 'mnmlseo', $section );
+}
+
+/****
+*
+* Section & Field Callbacks
+*
+****/
+function mnmlseo_ids_callback() {
+	echo "<p>Some help text</p>";
+}
+function mnmlseo_setting_callback_text( $args ) {
+	printf(
+		'<input type="text" name="%s" id="%s" value="%s" class="regular-text" placeholder="%s">',
+		$args['name'],
+		$args['label_for'],
+		$args['value'],
+		$args['placeholder']
+	);
+}
+function mnmlseo_setting_callback_textarea( $args ) {
+	printf(
+		'<textarea name="%s" id="%s" rows="10" class="large-text code">%s</textarea>',
+		$args['name'],
+		$args['label_for'],
+		$args['value']
+	);
+}
