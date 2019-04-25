@@ -23,21 +23,49 @@ Minimalist SEO. If not, see https://www.gnu.org/licenses/gpl-2.0.html.
 
 function mnmlseo_schema() {
 	
+	global $post;
+	$data = $post;// so that we don't accidentally explode the global (or just use $post = get_post(); )
+		
 	$metadata = $description = false;
 	
-	$mnmlseo_ids = get_option( 'mnmlseo_ids' );
+	$settings = get_option( 'mnmlseo' );
 	
-	if ( !empty( $mnmlseo_ids['fb_app_id'] ) )
-		echo "<meta property=fb:app_id content={$mnmlseo_ids['fb_app_id']}>";
+	if ( !empty( $settings['fb_app_id'] ) )
+		echo "<meta property=fb:app_id content={$settings['fb_app_id']}>";
+	
+	if ( !empty( $settings['twitter_site'] ) )
+		echo "<meta name=twitter:site content={$settings['twitter_site']}>";
 
 	
 	if ( is_front_page() ) {
 		
+		echo "<meta property=og:type content=website>";
+		
+		$title = get_option('blogname');
+		
+		echo "<meta property=og:title content='{$title}'>";// needed more for twitter than FB, but since twitter meta falls back to OG, why not use OG.
+		
+		/* DESCRIPTION */
+		if ( !empty( $settings['site_desc'] ) ) $description = $settings['site_desc'];
+		elseif ( !empty($data->ID) ) $description = get_post_meta( $data->ID, 'mnmlseo_description', true );
+		if ( ! $description ) $description = get_option( 'blogdescription' );
+		if ( $description ) {
+			echo "<meta name=description content='{$description}'>";
+			echo "<meta property=og:description content='{$description}'>";
+		}
+		
+		$url = home_url();
+		echo "<meta property=og:url content='{$url}'>";
+
+		
+		if ( !empty( $settings['site_image'] ) )
+			echo "<meta property=og:image content={$settings['site_image']}>";
+		
 		$metadata = array(
 			"@context" => "http://schema.org",
 			"@type" => "WebSite",
-			"name" => get_option('blogname'),
-			"url" => home_url(),
+			"name" => $title,
+			"url" => $url,
 			"potentialAction" => array(
 			    "@type" => "SearchAction",
 			    "target" => home_url() ."/?s={search_term_string}",
@@ -49,19 +77,13 @@ function mnmlseo_schema() {
 		
 		echo "<meta property=og:type content=article>";
 		// echo "<meta name=twitter:card content=summary_large_image>";// summary, summary_large_image, app, or player
-
-		
-		global $post;
-		
-		$data = $post; // so that we don't accidentally explode the global
 		
 		echo "<meta property=og:url content='". get_permalink( $data->ID ) ."'>";
 		
 		/** Author **/
 		$post_author = get_userdata( $data->post_author );
 		
-		if ( !empty( $mnmlseo_ids['twitter_site'] ) )
-			echo "<meta name=twitter:site content={$mnmlseo_ids['twitter_site']}>";
+		
 		// TODO: add author twitter field to user profiles.
 		// echo "<meta name=twitter:creator content='@authors_username'>";
 		
@@ -118,9 +140,11 @@ function mnmlseo_schema() {
 			// ),
 		);
 	
-		if ( has_post_thumbnail( $data->ID ) ) {
-			$post_image_src = wp_get_attachment_image_src( get_post_thumbnail_id( $data->ID ), 'full' );
-			if ( is_array( $post_image_src ) ) {
+		if ( has_post_thumbnail( $data->ID ) )
+		{	
+			$post_image_src = wp_get_attachment_image_src( get_post_thumbnail_id( $data->ID ), 'full' );			
+			if ( is_array( $post_image_src ) )
+			{
 				$metadata['image'] = array(
 					'@type' => 'ImageObject',
 					'url' => $post_image_src[0],
@@ -131,10 +155,18 @@ function mnmlseo_schema() {
 				echo "<meta name=twitter:card content=summary_large_image>";
 			}
 		}
+		elseif ( !empty( $settings['site_image'] ) )
+		{
+			$metadata['image'] = array(
+				'@type' => 'ImageObject',
+				'url' => $settings['site_image'],
+			);
+			echo "<meta property=og:image content={$settings['site_image']}>";
+		}
 	}
 	
 	if ( $metadata ) {
-		echo '<script type="application/ld+json">'. json_encode( $metadata ) .'</script>';
+		echo '<script type=application/ld+json>'. json_encode( $metadata ) .'</script>';
 	}
 }
 add_action( 'wp_head', 'mnmlseo_schema' );
@@ -143,6 +175,13 @@ add_action( 'wp_head', 'mnmlseo_schema' );
 function mnmlseo_custom_title() {
 	
 	$post = get_post();
+	
+	if ( ! $post || empty($post->ID) ) {
+		error_log( var_export( $post, true) );
+		error_log( 'get_queried_object_id = ' . get_queried_object_id() );
+		return '';
+	}
+	
 	$title = get_post_meta( $post->ID, 'mnmlseo_title', true );
 	
 	if ( ! $title ) {
@@ -252,33 +291,19 @@ function mnmlseo_save_seo_meta_box_data( $post_id ) {
 	 */
 	
 	// If this is an autosave, our form has not been submitted, so we don't want to do anything.
-	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
-		return;
-	}
+	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) return;
 	
 	// Check if our nonce is set.
-	if ( ! isset( $_POST['mnmlseo_meta_box_nonce'] ) ) {
-		return;
-	}
+	if ( ! isset( $_POST['mnmlseo_meta_box_nonce'] ) ) return;
 
 	// Verify that the nonce is valid.
-	if ( ! wp_verify_nonce( $_POST['mnmlseo_meta_box_nonce'], 'mnmlseo_save_meta_box_data' ) ) {
-		return;
-	}
+	if ( ! wp_verify_nonce( $_POST['mnmlseo_meta_box_nonce'], 'mnmlseo_save_meta_box_data' ) ) return;
 
 	// Check the user's permissions.
 	if ( isset( $_POST['post_type'] ) && 'page' == $_POST['post_type'] ) {
-
-		if ( ! current_user_can( 'edit_page', $post_id ) ) {
-			return;
-		}
-
-	} else {
-
-		if ( ! current_user_can( 'edit_post', $post_id ) ) {
-			return;
-		}
+		if ( ! current_user_can( 'edit_page', $post_id ) ) return;
 	}
+	elseif ( ! current_user_can( 'edit_post', $post_id ) ) return;
 
 	/* OK, it's safe for us to save the data now. */
 
@@ -336,25 +361,45 @@ function mnmlseo_settings_page() {
 }
 /****
 *
-* Settings > Email > SMTP
+* Settings > SEO
 *
 ****/
 function mnmlseo_settings_ids() {
 
-	$section = 'mnmlseo_ids';
+	$section = 'mnmlseo';
 	$settings = get_option( $section );
 	
 	add_settings_section(
 		$section,
-		'Account IDs',// heading
+		'',// heading
 		$section .'_callback',
 		'mnmlseo'
+	);
+	
+	$field = 'site_image';
+	add_settings_field(
+		"{$section}_{$field}",
+		'Default Preview Image',// label
+		'mnmlseo_setting_callback_text',
+		'mnmlseo',
+		$section,
+		array( 'label_for' => "{$section}_{$field}", 'name' => "{$section}[{$field}]", 'value' => isset($settings[$field]) ? $settings[$field] : '', 'placeholder' => "enter a full url" )
+	);
+	
+	$field = 'site_desc';
+	add_settings_field(
+		"{$section}_{$field}",
+		'Homepage Description',// label
+		'mnmlseo_setting_callback_textarea',
+		'mnmlseo',
+		$section,
+		array( 'label_for' => "{$section}_{$field}", 'name' => "{$section}[{$field}]", 'value' => isset($settings[$field]) ? $settings[$field] : '' )
 	);
 	
 	$field = 'twitter_site';
 	add_settings_field(
 		"{$section}_{$field}",
-		'Site-wide Twitter handle',// label
+		'Site-wide Twitter Handle',// label
 		'mnmlseo_setting_callback_text',
 		'mnmlseo',
 		$section,
@@ -380,8 +425,8 @@ function mnmlseo_settings_ids() {
 * Section & Field Callbacks
 *
 ****/
-function mnmlseo_ids_callback() {
-	echo "<p>Some help text</p>";
+function mnmlseo_callback() {
+	// echo "<p>Some help text</p>";
 }
 function mnmlseo_setting_callback_text( $args ) {
 	printf(
