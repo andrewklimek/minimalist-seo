@@ -176,17 +176,11 @@ function mnmlseo_custom_title() {
 	
 	$post = get_post();
 	
-	if ( ! $post || empty($post->ID) ) {
-		error_log( var_export( $post, true) );
-		error_log( 'get_queried_object_id = ' . get_queried_object_id() );
-		return '';
-	}
+	if ( ! $post ) return '';
 	
 	$title = get_post_meta( $post->ID, 'mnmlseo_title', true );
 	
-	if ( ! $title ) {
-		return '';
-	}
+	if ( ! $title ) return '';
 
 	$title = str_ireplace( '[title]', $post->post_title, $title );
 	
